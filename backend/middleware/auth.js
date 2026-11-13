@@ -1,7 +1,8 @@
 const ErrorHander = require("../utils/errorhander");
 const catchAsyncErrors = require("./catchAsyncErrors");
 const jwt = require("jsonwebtoken");
-const User = require("../models/userModel");
+const prisma = require("../config/prisma");
+const { normalizeId } = require("../utils/userHelper");
 
 exports.isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
   const { token } = req.cookies;
@@ -12,7 +13,15 @@ exports.isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
 
   const decodedData = jwt.verify(token, process.env.JWT_SECRET);
 
-  req.user = await User.findById(decodedData.id);
+  const user = await prisma.user.findUnique({
+    where: { id: decodedData.id },
+  });
+
+  if (!user) {
+    return next(new ErrorHander("User not found or session expired", 401));
+  }
+
+  req.user = normalizeId(user);
 
   next();
 });
@@ -22,7 +31,7 @@ exports.authorizeRoles = (...roles) => {
     if (!roles.includes(req.user.role)) {
       return next(
         new ErrorHander(
-          `Role: ${req.user.role} is not allowed to access this resouce `,
+          `Role: ${req.user.role} is not allowed to access this resource `,
           403
         )
       );

@@ -1,8 +1,9 @@
-const Product = require("../models/productModel");
+const prisma = require("../config/prisma");
 const ErrorHander = require("../utils/errorhander");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const ApiFeatures = require("../utils/apifeatures");
 const cloudinary = require("cloudinary");
+const { normalizeId } = require("../utils/userHelper");
 
 // Create Product -- Admin
 exports.createProduct = catchAsyncErrors(async (req, res, next) => {
@@ -10,7 +11,7 @@ exports.createProduct = catchAsyncErrors(async (req, res, next) => {
 
   if (typeof req.body.images === "string") {
     images.push(req.body.images);
-  } else {
+  } else if (Array.isArray(req.body.images)) {
     images = req.body.images;
   }
 
@@ -27,37 +28,51 @@ exports.createProduct = catchAsyncErrors(async (req, res, next) => {
     });
   }
 
-  req.body.images = imagesLinks;
-  req.body.user = req.user.id;
+  const { name, description, price, category, Stock } = req.body;
 
-  const product = await Product.create(req.body);
+  const product = await prisma.product.create({
+    data: {
+      name,
+      description,
+      price: Number(price),
+      category,
+      Stock: Stock !== undefined ? Number(Stock) : 1,
+      images: imagesLinks,
+      userId: req.user.id,
+    },
+    include: {
+      reviews: true,
+    },
+  });
 
   res.status(201).json({
     success: true,
-    product,
+    product: normalizeId(product),
   });
 });
 
 // Get All Product
 exports.getAllProducts = catchAsyncErrors(async (req, res, next) => {
   const resultPerPage = 8;
-  const productsCount = await Product.countDocuments();
+  const productsCount = await prisma.product.count();
 
-  const apiFeature = new ApiFeatures(Product.find(), req.query)
+  const apiFeature = new ApiFeatures(prisma.product, req.query)
     .search()
     .filter();
 
-  let products = await apiFeature.query;
-
-  let filteredProductsCount = products.length;
+  const filteredProductsCount = await apiFeature.count();
 
   apiFeature.pagination(resultPerPage);
 
-  products = await apiFeature.query;
+  const products = await apiFeature.execute({
+    include: {
+      reviews: true,
+    },
+  });
 
   res.status(200).json({
     success: true,
-    products,
+    products: normalizeId(products),
     productsCount,
     resultPerPage,
     filteredProductsCount,
@@ -66,17 +81,27 @@ exports.getAllProducts = catchAsyncErrors(async (req, res, next) => {
 
 // Get All Product (Admin)
 exports.getAdminProducts = catchAsyncErrors(async (req, res, next) => {
-  const products = await Product.find();
+  const products = await prisma.product.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      reviews: true,
+    },
+  });
 
   res.status(200).json({
     success: true,
-    products,
+    products: normalizeId(products),
   });
 });
 
 // Get Product Details
 exports.getProductDetails = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.params.id);
+  const product = await prisma.product.findUnique({
+    where: { id: req.params.id },
+    include: {
+      reviews: true,
+    },
+  });
 
   if (!product) {
     return next(new ErrorHander("Product not found", 404));
@@ -84,77 +109,95 @@ exports.getProductDetails = catchAsyncErrors(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    product,
+    product: normalizeId(product),
   });
 });
 
 // Update Product -- Admin
-
 exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
-  let product = await Product.findById(req.params.id);
+  let product = await prisma.product.findUnique({
+    where: { id: req.params.id },
+  });
 
   if (!product) {
     return next(new ErrorHander("Product not found", 404));
   }
 
-  // Images Start Here
-  let images = [];
+  const updateData = {};
+  if (req.body.name !== undefined) updateData.name = req.body.name;
+  if (req.body.description !== undefined) updateData.description = req.body.description;
+  if (req.body.price !== undefined) updateData.price = Number(req.body.price);
+  if (req.body.category !== undefined) updateData.category = req.body.category;
+  if (req.body.Stock !== undefined) updateData.Stock = Number(req.body.Stock);
 
+  // Images handling
+  let images = [];
   if (typeof req.body.images === "string") {
     images.push(req.body.images);
-  } else {
+  } else if (Array.isArray(req.body.images)) {
     images = req.body.images;
   }
 
-  if (images !== undefined) {
-    // Deleting Images From Cloudinary
-    for (let i = 0; i < product.images.length; i++) {
-      await cloudinary.v2.uploader.destroy(product.images[i].public_id);
+  if (images.length > 0) {
+    // Delete existing Cloudinary images
+    if (Array.isArray(product.images)) {
+      for (let i = 0; i < product.images.length; i++) {
+        if (product.images[i].public_id) {
+          await cloudinary.v2.uploader.destroy(product.images[i].public_id);
+        }
+      }
     }
 
     const imagesLinks = [];
-
     for (let i = 0; i < images.length; i++) {
       const result = await cloudinary.v2.uploader.upload(images[i], {
         folder: "products",
       });
-
       imagesLinks.push({
         public_id: result.public_id,
         url: result.secure_url,
       });
     }
 
-    req.body.images = imagesLinks;
+    updateData.images = imagesLinks;
   }
 
-  product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-    useFindAndModify: false,
+  const updatedProduct = await prisma.product.update({
+    where: { id: req.params.id },
+    data: updateData,
+    include: {
+      reviews: true,
+    },
   });
 
   res.status(200).json({
     success: true,
-    product,
+    product: normalizeId(updatedProduct),
   });
 });
 
 // Delete Product
-
 exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.params.id);
+  const product = await prisma.product.findUnique({
+    where: { id: req.params.id },
+  });
 
   if (!product) {
     return next(new ErrorHander("Product not found", 404));
   }
 
   // Deleting Images From Cloudinary
-  for (let i = 0; i < product.images.length; i++) {
-    await cloudinary.v2.uploader.destroy(product.images[i].public_id);
+  if (Array.isArray(product.images)) {
+    for (let i = 0; i < product.images.length; i++) {
+      if (product.images[i].public_id) {
+        await cloudinary.v2.uploader.destroy(product.images[i].public_id);
+      }
+    }
   }
 
-  await product.remove();
+  await prisma.product.delete({
+    where: { id: req.params.id },
+  });
 
   res.status(200).json({
     success: true,
@@ -166,38 +209,58 @@ exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
 exports.createProductReview = catchAsyncErrors(async (req, res, next) => {
   const { rating, comment, productId } = req.body;
 
-  const review = {
-    user: req.user._id,
-    name: req.user.name,
-    rating: Number(rating),
-    comment,
-  };
-
-  const product = await Product.findById(productId);
-
-  const isReviewed = product.reviews.find(
-    (rev) => rev.user.toString() === req.user._id.toString()
-  );
-
-  if (isReviewed) {
-    product.reviews.forEach((rev) => {
-      if (rev.user.toString() === req.user._id.toString())
-        (rev.rating = rating), (rev.comment = comment);
-    });
-  } else {
-    product.reviews.push(review);
-    product.numOfReviews = product.reviews.length;
-  }
-
-  let avg = 0;
-
-  product.reviews.forEach((rev) => {
-    avg += rev.rating;
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: { reviews: true },
   });
 
-  product.ratings = avg / product.reviews.length;
+  if (!product) {
+    return next(new ErrorHander("Product not found", 404));
+  }
 
-  await product.save({ validateBeforeSave: false });
+  const existingReview = product.reviews.find(
+    (rev) => rev.userId === req.user.id
+  );
+
+  if (existingReview) {
+    await prisma.review.update({
+      where: { id: existingReview.id },
+      data: {
+        rating: Number(rating),
+        comment,
+      },
+    });
+  } else {
+    await prisma.review.create({
+      data: {
+        userId: req.user.id,
+        productId,
+        name: req.user.name,
+        rating: Number(rating),
+        comment,
+      },
+    });
+  }
+
+  // Recalculate average rating & numOfReviews
+  const allReviews = await prisma.review.findMany({
+    where: { productId },
+  });
+
+  const numOfReviews = allReviews.length;
+  let avgRating = 0;
+  if (numOfReviews > 0) {
+    avgRating =
+      allReviews.reduce((acc, item) => item.rating + acc, 0) / numOfReviews;
+  }
+
+  await prisma.product.update({
+    where: { id: productId },
+    data: {
+      ratings: avgRating,
+      numOfReviews,
+    },
+  });
 
   res.status(200).json({
     success: true,
@@ -206,7 +269,12 @@ exports.createProductReview = catchAsyncErrors(async (req, res, next) => {
 
 // Get All Reviews of a product
 exports.getProductReviews = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.query.id);
+  const product = await prisma.product.findUnique({
+    where: { id: req.query.id },
+    include: {
+      reviews: true,
+    },
+  });
 
   if (!product) {
     return next(new ErrorHander("Product not found", 404));
@@ -214,51 +282,44 @@ exports.getProductReviews = catchAsyncErrors(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    reviews: product.reviews,
+    reviews: normalizeId(product.reviews),
   });
 });
 
 // Delete Review
 exports.deleteReview = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.query.productId);
-
-  if (!product) {
-    return next(new ErrorHander("Product not found", 404));
-  }
-
-  const reviews = product.reviews.filter(
-    (rev) => rev._id.toString() !== req.query.id.toString()
-  );
-
-  let avg = 0;
-
-  reviews.forEach((rev) => {
-    avg += rev.rating;
+  const review = await prisma.review.findUnique({
+    where: { id: req.query.id },
   });
 
-  let ratings = 0;
-
-  if (reviews.length === 0) {
-    ratings = 0;
-  } else {
-    ratings = avg / reviews.length;
+  if (!review) {
+    return next(new ErrorHander("Review not found", 404));
   }
 
-  const numOfReviews = reviews.length;
+  const productId = req.query.productId || review.productId;
 
-  await Product.findByIdAndUpdate(
-    req.query.productId,
-    {
-      reviews,
+  await prisma.review.delete({
+    where: { id: req.query.id },
+  });
+
+  const remainingReviews = await prisma.review.findMany({
+    where: { productId },
+  });
+
+  const numOfReviews = remainingReviews.length;
+  let ratings = 0;
+  if (numOfReviews > 0) {
+    const sum = remainingReviews.reduce((acc, item) => item.rating + acc, 0);
+    ratings = sum / numOfReviews;
+  }
+
+  await prisma.product.update({
+    where: { id: productId },
+    data: {
       ratings,
       numOfReviews,
     },
-    {
-      new: true,
-      runValidators: true,
-      useFindAndModify: false,
-    }
-  );
+  });
 
   res.status(200).json({
     success: true,

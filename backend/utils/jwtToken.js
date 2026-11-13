@@ -1,19 +1,27 @@
-// Create Token and saving in cookie
+const { getJWTToken, normalizeId } = require("./userHelper");
 
+// Create Token and saving in cookie
 const sendToken = (user, statusCode, res) => {
-  const token = user.getJWTToken();
+  const token = getJWTToken(user.id);
 
   // options for cookie
+  const cookieExpireDays = Number(process.env.COOKIE_EXPIRE) || 5;
   const options = {
     expires: new Date(
-      Date.now() + process.env.COOKIE_EXPIRE * 24 * 60 * 60 * 1000
+      Date.now() + cookieExpireDays * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
   };
 
+  // Safe user copy without password
+  const userResponse = normalizeId({ ...user });
+  delete userResponse.password;
+  delete userResponse.resetPasswordToken;
+  delete userResponse.resetPasswordExpire;
+
   res.status(statusCode).cookie("token", token, options).json({
     success: true,
-    user,
+    user: userResponse,
     token,
   });
 };
