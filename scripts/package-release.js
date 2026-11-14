@@ -4,7 +4,7 @@
  * Generates and validates the deployment ZIP artifact: cloudlib-release.zip
  *
  * Requirements verified:
- * - Includes: backend, frontend, prisma, aws, package files, configs, migrations
+ * - Includes: backend (with prisma/), frontend, aws, package files, configs, migrations
  * - Excludes: .env, node_modules, .git, *.pem, *.key, caches
  * - Validates ZIP integrity and folder structure
  *
@@ -66,10 +66,11 @@ try {
     "backend/server.js",
     "backend/app.js",
     "backend/utils/s3.js",
+    "backend/package.json",
+    "backend/prisma/schema.prisma",
+    "backend/prisma/migrations/",
     "frontend/package.json",
     "frontend/src/App.js",
-    "prisma/schema.prisma",
-    "prisma/migrations/0_init/migration.sql",
     "aws/scripts/bootstrap-ec2.sh",
     "aws/nginx/cloudlib.conf",
     "aws/systemd/cloudlib.service",

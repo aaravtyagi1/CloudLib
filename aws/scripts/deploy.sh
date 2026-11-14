@@ -28,6 +28,7 @@ chown -R ec2-user:ec2-user "${APP_DIR}"
 
 # 3. Update backend dependencies & Prisma
 echo "Installing backend dependencies..."
+cd "${APP_DIR}/backend"
 npm install --omit=dev
 npx prisma generate
 
@@ -39,6 +40,8 @@ if [[ -n "${DATABASE_URL:-}" ]]; then
     echo "Applying database migrations..."
     npx prisma migrate deploy
 fi
+
+cd "${APP_DIR}"
 
 # 5. Build frontend
 echo "Building React frontend..."

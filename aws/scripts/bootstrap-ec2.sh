@@ -65,8 +65,8 @@ chown -R ec2-user:ec2-user "${APP_DIR}"
 
 # Verify required project files
 echo "Verifying project structure..."
-if [[ ! -f "${APP_DIR}/package.json" || ! -f "${APP_DIR}/backend/server.js" ]]; then
-    echo "❌ ERROR: Invalid deployment package. package.json or backend/server.js missing!"
+if [[ ! -f "${APP_DIR}/package.json" || ! -f "${APP_DIR}/backend/server.js" || ! -f "${APP_DIR}/backend/package.json" ]]; then
+    echo "❌ ERROR: Invalid deployment package. Missing package.json, backend/server.js, or backend/package.json!"
     exit 1
 fi
 
@@ -111,10 +111,13 @@ fi
 # 6. INSTALL BACKEND DEPENDENCIES & PRISMA CLIENT
 # ------------------------------------------------------------------------------
 echo "[Step 6/10] Installing backend dependencies..."
+cd "${APP_DIR}/backend"
 npm install --omit=dev
 
 echo "Generating Prisma Client..."
 npx prisma generate
+
+cd "${APP_DIR}"
 
 # ------------------------------------------------------------------------------
 # 7. APPLY POSTGRESQL DATABASE MIGRATIONS SAFELY
@@ -126,9 +129,11 @@ fi
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
     echo "Running 'prisma migrate deploy' to apply pending migrations safely without data loss..."
+    cd "${APP_DIR}/backend"
     npx prisma migrate deploy || {
         echo "⚠️  Prisma migrate deploy encountered an error. Check database connectivity."
     }
+    cd "${APP_DIR}"
 else
     echo "⚠️  DATABASE_URL is not set yet. Skipping migration. Run 'npm run prisma:migrate' after setting DATABASE_URL."
 fi
