@@ -1,0 +1,29 @@
+[Unit]
+Description=CloudLib Backend Express Application
+Documentation=https://github.com/aaravtyagi1/CloudLib
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/cloudlib
+Environment=NODE_ENV=production
+Environment=PORT=4000
+Environment=PATH=/usr/bin:/usr/local/bin:/bin
+# Optional environment file if Secrets Manager writes local config
+EnvironmentFile=-/opt/cloudlib/backend/config/config.env
+ExecStart=/usr/bin/node backend/server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudlib-backend
+
+# Security sandboxing
+NoNewPrivileges=true
+ProtectSystem=full
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

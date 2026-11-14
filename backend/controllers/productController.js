@@ -2,7 +2,11 @@ const prisma = require("../config/prisma");
 const ErrorHander = require("../utils/errorhander");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const ApiFeatures = require("../utils/apifeatures");
-const cloudinary = require("cloudinary");
+const {
+  uploadToS3,
+  deleteFromS3,
+  resolveDocumentMedia,
+} = require("../utils/s3");
 const { normalizeId } = require("../utils/userHelper");
 
 // Create Product -- Admin
@@ -18,13 +22,11 @@ exports.createProduct = catchAsyncErrors(async (req, res, next) => {
   const imagesLinks = [];
 
   for (let i = 0; i < images.length; i++) {
-    const result = await cloudinary.v2.uploader.upload(images[i], {
-      folder: "products",
-    });
+    const s3Result = await uploadToS3(images[i], "products");
 
     imagesLinks.push({
-      public_id: result.public_id,
-      url: result.secure_url,
+      public_id: s3Result.key,
+      url: s3Result.key,
     });
   }
 
@@ -45,9 +47,11 @@ exports.createProduct = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
+  const resolvedProduct = await resolveDocumentMedia(normalizeId(product));
+
   res.status(201).json({
     success: true,
-    product: normalizeId(product),
+    product: resolvedProduct,
   });
 });
 
@@ -70,9 +74,11 @@ exports.getAllProducts = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
+  const resolvedProducts = await resolveDocumentMedia(normalizeId(products));
+
   res.status(200).json({
     success: true,
-    products: normalizeId(products),
+    products: resolvedProducts,
     productsCount,
     resultPerPage,
     filteredProductsCount,
@@ -88,9 +94,11 @@ exports.getAdminProducts = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
+  const resolvedProducts = await resolveDocumentMedia(normalizeId(products));
+
   res.status(200).json({
     success: true,
-    products: normalizeId(products),
+    products: resolvedProducts,
   });
 });
 
@@ -107,9 +115,11 @@ exports.getProductDetails = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHander("Product not found", 404));
   }
 
+  const resolvedProduct = await resolveDocumentMedia(normalizeId(product));
+
   res.status(200).json({
     success: true,
-    product: normalizeId(product),
+    product: resolvedProduct,
   });
 });
 
@@ -139,23 +149,21 @@ exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
   }
 
   if (images.length > 0) {
-    // Delete existing Cloudinary images
+    // Delete existing S3 images
     if (Array.isArray(product.images)) {
       for (let i = 0; i < product.images.length; i++) {
         if (product.images[i].public_id) {
-          await cloudinary.v2.uploader.destroy(product.images[i].public_id);
+          await deleteFromS3(product.images[i].public_id);
         }
       }
     }
 
     const imagesLinks = [];
     for (let i = 0; i < images.length; i++) {
-      const result = await cloudinary.v2.uploader.upload(images[i], {
-        folder: "products",
-      });
+      const s3Result = await uploadToS3(images[i], "products");
       imagesLinks.push({
-        public_id: result.public_id,
-        url: result.secure_url,
+        public_id: s3Result.key,
+        url: s3Result.key,
       });
     }
 
@@ -170,9 +178,11 @@ exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
+  const resolvedProduct = await resolveDocumentMedia(normalizeId(updatedProduct));
+
   res.status(200).json({
     success: true,
-    product: normalizeId(updatedProduct),
+    product: resolvedProduct,
   });
 });
 
@@ -186,11 +196,11 @@ exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHander("Product not found", 404));
   }
 
-  // Deleting Images From Cloudinary
+  // Deleting Images From S3
   if (Array.isArray(product.images)) {
     for (let i = 0; i < product.images.length; i++) {
       if (product.images[i].public_id) {
-        await cloudinary.v2.uploader.destroy(product.images[i].public_id);
+        await deleteFromS3(product.images[i].public_id);
       }
     }
   }

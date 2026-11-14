@@ -4,7 +4,11 @@ const prisma = require("../config/prisma");
 const sendToken = require("../utils/jwtToken");
 const sendEmail = require("../utils/sendEmail");
 const crypto = require("crypto");
-const cloudinary = require("cloudinary");
+const {
+  uploadToS3,
+  deleteFromS3,
+  resolveDocumentMedia,
+} = require("../utils/s3");
 const {
   hashPassword,
   comparePassword,
@@ -21,15 +25,11 @@ exports.registerUser = catchAsyncErrors(async (req, res, next) => {
     url: "profileUrl",
   };
 
-  if (avatar) {
-    const myCloud = await cloudinary.v2.uploader.upload(avatar, {
-      folder: "avatars",
-      width: 150,
-      crop: "scale",
-    });
+  if (avatar && avatar !== "" && avatar !== "profileUrl") {
+    const s3Result = await uploadToS3(avatar, "avatars");
     avatarData = {
-      public_id: myCloud.public_id,
-      url: myCloud.secure_url,
+      public_id: s3Result.key,
+      url: s3Result.key,
     };
   }
 
@@ -44,7 +44,8 @@ exports.registerUser = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
-  sendToken(user, 201, res);
+  const resolvedUser = await resolveDocumentMedia(normalizeId(user));
+  sendToken(resolvedUser, 201, res);
 });
 
 // Login User
@@ -69,7 +70,8 @@ exports.loginUser = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHander("Invalid email or password", 401));
   }
 
-  sendToken(user, 200, res);
+  const resolvedUser = await resolveDocumentMedia(normalizeId(user));
+  sendToken(resolvedUser, 200, res);
 });
 
 // Logout User
@@ -177,7 +179,8 @@ exports.resetPassword = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
-  sendToken(updatedUser, 200, res);
+  const resolvedUser = await resolveDocumentMedia(normalizeId(updatedUser));
+  sendToken(resolvedUser, 200, res);
 });
 
 // Get User Detail
@@ -186,12 +189,12 @@ exports.getUserDetails = catchAsyncErrors(async (req, res, next) => {
     where: { id: req.user.id },
   });
 
-  const userResponse = normalizeId({ ...user });
-  delete userResponse.password;
+  const resolvedUser = await resolveDocumentMedia(normalizeId({ ...user }));
+  delete resolvedUser.password;
 
   res.status(200).json({
     success: true,
-    user: userResponse,
+    user: resolvedUser,
   });
 });
 
@@ -223,7 +226,8 @@ exports.updatePassword = catchAsyncErrors(async (req, res, next) => {
     },
   });
 
-  sendToken(updatedUser, 200, res);
+  const resolvedUser = await resolveDocumentMedia(normalizeId(updatedUser));
+  sendToken(resolvedUser, 200, res);
 });
 
 // update User Profile
@@ -233,24 +237,19 @@ exports.updateProfile = catchAsyncErrors(async (req, res, next) => {
     email: req.body.email,
   };
 
-  if (req.body.avatar && req.body.avatar !== "") {
+  if (req.body.avatar && req.body.avatar !== "" && req.body.avatar !== "profileUrl") {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
     });
 
-    if (user.avatar && user.avatar.public_id) {
-      await cloudinary.v2.uploader.destroy(user.avatar.public_id);
+    if (user.avatar && user.avatar.public_id && user.avatar.public_id !== "sample_id") {
+      await deleteFromS3(user.avatar.public_id);
     }
 
-    const myCloud = await cloudinary.v2.uploader.upload(req.body.avatar, {
-      folder: "avatars",
-      width: 150,
-      crop: "scale",
-    });
-
+    const s3Result = await uploadToS3(req.body.avatar, "avatars");
     newUserData.avatar = {
-      public_id: myCloud.public_id,
-      url: myCloud.secure_url,
+      public_id: s3Result.key,
+      url: s3Result.key,
     };
   }
 
@@ -270,15 +269,17 @@ exports.getAllUser = catchAsyncErrors(async (req, res, next) => {
     orderBy: { createdAt: "desc" },
   });
 
-  const safeUsers = users.map((u) => {
-    const userCopy = normalizeId({ ...u });
-    delete userCopy.password;
-    return userCopy;
-  });
+  const resolvedUsers = await resolveDocumentMedia(
+    users.map((u) => {
+      const userCopy = normalizeId({ ...u });
+      delete userCopy.password;
+      return userCopy;
+    })
+  );
 
   res.status(200).json({
     success: true,
-    users: safeUsers,
+    users: resolvedUsers,
   });
 });
 
@@ -294,12 +295,12 @@ exports.getSingleUser = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  const userResponse = normalizeId({ ...user });
-  delete userResponse.password;
+  const resolvedUser = await resolveDocumentMedia(normalizeId({ ...user }));
+  delete resolvedUser.password;
 
   res.status(200).json({
     success: true,
-    user: userResponse,
+    user: resolvedUser,
   });
 });
 
@@ -333,8 +334,8 @@ exports.deleteUser = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  if (user.avatar && user.avatar.public_id) {
-    await cloudinary.v2.uploader.destroy(user.avatar.public_id);
+  if (user.avatar && user.avatar.public_id && user.avatar.public_id !== "sample_id") {
+    await deleteFromS3(user.avatar.public_id);
   }
 
   await prisma.user.delete({

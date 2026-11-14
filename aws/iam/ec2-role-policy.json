@@ -1,0 +1,51 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowS3DeploymentArtifactDownload",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_DEPLOYMENT_BUCKET_NAME",
+        "arn:aws:s3:::YOUR_DEPLOYMENT_BUCKET_NAME/*"
+      ]
+    },
+    {
+      "Sid": "AllowS3ApplicationUploadsAndStorage",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_UPLOADS_BUCKET_NAME",
+        "arn:aws:s3:::YOUR_UPLOADS_BUCKET_NAME/*"
+      ]
+    },
+    {
+      "Sid": "AllowSecretsManagerReadProductionEnv",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:eu-north-1:YOUR_ACCOUNT_ID:secret:cloudlib/backend/env*"
+    },
+    {
+      "Sid": "AllowCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": "arn:aws:logs:eu-north-1:YOUR_ACCOUNT_ID:log-group:/aws/ec2/cloudlib*"
+    }
+  ]
+}

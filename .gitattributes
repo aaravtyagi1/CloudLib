@@ -1,0 +1,10 @@
+# Git Archive Export Attributes
+# Files marked with export-ignore will not be included in deployment ZIP archives
+
+.env export-ignore
+.env.* export-ignore
+*.pem export-ignore
+*.key export-ignore
+*.zip export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
