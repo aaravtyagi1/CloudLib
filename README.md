@@ -17,8 +17,6 @@ CloudLib is a production-grade full-stack e-commerce web application engineered 
 | **Process Manager** | Systemd | Self-healing service daemon on Amazon Linux 2023 |
 | **Secrets Management** | AWS Secrets Manager | Production credential management (`cloudlib/backend/env`) |
 | **Cloud IAM** | AWS IAM Instance Role | Role-based authorization (`CloudLib-EC2-Role`) |
-| **Payments** | Stripe API | Secure card payments via Stripe Payment Intents |
-| **Email** | Nodemailer (SMTP) | Password recovery and email notifications |
 
 ---
 

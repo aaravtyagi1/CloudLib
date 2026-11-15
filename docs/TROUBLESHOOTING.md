@@ -153,10 +153,10 @@ sudo ss -tulpn | grep -E ':(80|4000|5432)'
 
 ## 6. Migration & Legacy Data Issues
 
-### Issue: Legacy Cloudinary images in existing database records
-- **Symptoms:** Existing products have image URLs starting with `https://res.cloudinary.com/...`.
+### Issue: External images in existing database records
+- **Symptoms:** Existing products have image URLs starting with `https://...`.
 - **Resolution:**
   - The S3 resolution utility in `backend/utils/s3.js` automatically checks if an image URL starts with `http://` or `https://`.
-  - Cloudinary URLs are passed directly through to the client without alteration.
+  - External URLs are passed directly through to the client without alteration.
   - New uploads are stored in Amazon S3 as clean object keys (`products/uuid.jpg`).
-  - No database migration or data alteration is required for existing Cloudinary image records.
+  - No database migration or data alteration is required for existing external image records.

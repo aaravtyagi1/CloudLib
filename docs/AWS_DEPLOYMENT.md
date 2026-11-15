@@ -120,13 +120,6 @@ This role allows your EC2 instance to download the deployment ZIP, read Secrets 
      COOKIE_EXPIRE=5
      AWS_REGION=eu-north-1
      S3_UPLOAD_BUCKET=cloudlib-uploads-<account-id>
-     SMPT_SERVICE=gmail
-     SMPT_MAIL=your_email@gmail.com
-     SMPT_PASSWORD=your_email_app_password
-     SMPT_HOST=smtp.gmail.com
-     SMPT_PORT=465
-     STRIPE_API_KEY=pk_test_...
-     STRIPE_SECRET_KEY=sk_test_...
      ```
 5. Click **Next**.
 6. **Secret name:** `cloudlib/backend/env`.

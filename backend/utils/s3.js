@@ -133,7 +133,7 @@ const deleteFromS3 = async (keyOrPublicId) => {
     return false;
   }
 
-  // If this is a legacy Cloudinary URL or non-S3 key, don't attempt S3 deletion
+  // If this is an external URL or non-S3 key, don't attempt S3 deletion
   if (keyOrPublicId.startsWith("http://") || keyOrPublicId.startsWith("https://")) {
     if (!bucketName || !keyOrPublicId.includes(bucketName)) {
       return false;
@@ -164,7 +164,7 @@ const deleteFromS3 = async (keyOrPublicId) => {
 const getPresignedDownloadUrl = async (key, expiresIn = 3600) => {
   if (!key || typeof key !== "string") return "";
 
-  // If already an external URL (e.g. legacy Cloudinary or external image), return as is
+  // If already an external URL (e.g. external image), return as is
   if (key.startsWith("http://") || key.startsWith("https://")) {
     return key;
   }
@@ -219,7 +219,7 @@ const getPresignedUploadUrl = async (folder = "uploads", fileType = "image/jpeg"
 
 /**
  * Resolves a media object or key into a displayable URL:
- * - Keeps legacy Cloudinary URLs intact
+ * - Keeps external URLs intact
  * - Generates presigned URLs for private S3 keys
  * - Leaves standard local fallbacks intact
  */

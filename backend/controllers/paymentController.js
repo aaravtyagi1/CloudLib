@@ -1,31 +1,8 @@
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
-const ErrorHander = require("../utils/errorhander");
-
-const getStripe = () => {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new ErrorHander(
-      "STRIPE_SECRET_KEY is not configured on the server. Please supply your Stripe secret key.",
-      500
-    );
-  }
-  return require("stripe")(process.env.STRIPE_SECRET_KEY);
-};
 
 exports.processPayment = catchAsyncErrors(async (req, res, next) => {
-  const stripe = getStripe();
-  const myPayment = await stripe.paymentIntents.create({
-    amount: req.body.amount,
-    currency: "inr",
-    metadata: {
-      company: "Ecommerce",
-    },
+  res.status(200).json({
+    success: true,
+    message: "Payment processed successfully",
   });
-
-  res
-    .status(200)
-    .json({ success: true, client_secret: myPayment.client_secret });
-});
-
-exports.sendStripeApiKey = catchAsyncErrors(async (req, res, next) => {
-  res.status(200).json({ stripeApiKey: process.env.STRIPE_API_KEY || "" });
 });

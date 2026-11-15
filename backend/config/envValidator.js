@@ -65,14 +65,6 @@ function validateEnv() {
     process.env.AWS_REGION = "eu-north-1";
   }
 
-  // 6. SMTP Configuration check
-  if (!process.env.SMPT_MAIL || !process.env.SMPT_PASSWORD) {
-    warnings.push({
-      key: "SMPT_MAIL / SMPT_PASSWORD",
-      message: "SMTP email credentials are not fully configured. Password reset emails will fail until configured.",
-    });
-  }
-
   // Print summary
   if (missingCritical.length > 0) {
     console.error("\n=======================================================");

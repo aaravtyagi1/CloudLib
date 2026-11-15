@@ -20,13 +20,6 @@ This document explains every configuration variable used by CloudLib, its sensit
 | `FRONTEND_URL` | Frontend origin for CORS | Optional | No | Express | EC2 Public IP / Domain (e.g. `http://54.x.x.x`) |
 | `BACKEND_URL` | Backend origin for absolute links | Optional | No | Express | EC2 Public IP / Domain (e.g. `http://54.x.x.x:4000`) |
 | `CORS_ORIGIN` | Allowed CORS origins | Optional | No | Express | EC2 Public IP / Domain |
-| `SMPT_SERVICE` | Email provider service name | Optional | No | Express | `gmail` or SMTP provider |
-| `SMPT_MAIL` | Sender email address for password resets | Optional | **Yes** | Express | Your sender email (e.g. Gmail) |
-| `SMPT_PASSWORD` | App password for SMTP account | Optional | **Yes** | Express | App-specific password from email provider |
-| `SMPT_HOST` | SMTP server hostname | Optional | No | Express | `smtp.gmail.com` or custom SMTP host |
-| `SMPT_PORT` | SMTP port | Optional | No | Express | `465` (SSL) or `587` (TLS) |
-| `STRIPE_API_KEY` | Stripe publishable key | Optional | No | Express & React | Stripe Dashboard (Developer > API keys) |
-| `STRIPE_SECRET_KEY` | Stripe secret key for payment intents | Optional | **Yes** | Express only | Stripe Dashboard (Developer > API keys) |
 | `GENERATE_SOURCEMAP` | Disables sourcemap generation in build | Optional | No | React only | `.env` (`false` reduces memory usage) |
 | `DISABLE_ESLINT_PLUGIN` | Disables ESLint blocking in build | Optional | No | React only | `.env` (`true` prevents webpack build failures) |
 
@@ -72,23 +65,10 @@ This document explains every configuration variable used by CloudLib, its sensit
 - **Example:** `cloudlib/backend/env`
 - **Notes:** Specifies the AWS Secrets Manager Secret ID retrieved at boot using the IAM instance profile (`CloudLib-EC2-Role`).
 
-### 6. `SMPT_SERVICE`, `SMPT_MAIL`, `SMPT_PASSWORD`, `SMPT_HOST`, `SMPT_PORT`
-- **Component:** Backend
-- **Required:** Optional (required only for password reset email workflows)
-- **Sensitive:** **YES (`SMPT_PASSWORD` and `SMPT_MAIL`)**
-- **Notes:** Maintains the original `SMPT_` naming convention from the codebase. For Gmail, generate an **App Password** from your Google Account settings.
-
-### 7. `STRIPE_API_KEY` and `STRIPE_SECRET_KEY`
-- **Component:**
-  - `STRIPE_API_KEY` is publishable and can be returned via `/api/v1/stripeapikey`.
-  - `STRIPE_SECRET_KEY` is **strictly confidential** and stays on the backend.
-- **Required:** Optional (required only for payment processing)
-- **Sensitive:** `STRIPE_SECRET_KEY` is **YES**.
-
 ---
 
 ## Production Security Best Practices
 
 1. **No Hardcoded Keys:** Production EC2 instances must use the IAM instance role `CloudLib-EC2-Role`. Never set `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` in production files.
 2. **Secrets Manager:** All sensitive backend variables should reside in AWS Secrets Manager (`cloudlib/backend/env`).
-3. **Frontend Isolation:** The React frontend receives only public configuration (such as the Stripe publishable key via `/api/v1/stripeapikey`). Database credentials, JWT secrets, and AWS secrets are never bundled into the client build.
+3. **Frontend Isolation:** The React frontend receives only public configuration. Database credentials, JWT secrets, and AWS secrets are never bundled into the client build.
